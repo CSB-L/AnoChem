@@ -1,0 +1,1 @@
+python main.py -i ./input/input.txt -o ./output/output.txt -s
