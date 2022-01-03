@@ -86,8 +86,14 @@ if __name__ == '__main__':
     smiles_list = read_smiles(smiles_input)
     
     fp = open(output_file, 'w')
+    fp.write('%s\t%s\n'%('Smiles', 'Result'))
     for smiles in tqdm.tqdm(smiles_list):
-        flag = func(smiles, loaded_encoder_model)
+        try:
+            flag = func(smiles, loaded_encoder_model)            
+        except:
+            fp.write('%s\t%s\n'%(smiles, 'Error'))
+            continue
+            
         fp.write('%s\t%s\n'%(smiles, flag))
     fp.close()
 
