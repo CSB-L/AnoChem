@@ -29,6 +29,8 @@ def check_structure_original(smiles, loaded_encoder_model, fingerprint_type, thr
     pred_feat = np.where(results > 0.5, 1, 0)
     
     sim = calc_sim(feat[0], pred_feat[0])
+    return sim
+
     if sim >= threshold:
         return True
     else:
@@ -48,11 +50,17 @@ def check_structure_scaffold(smiles, loaded_encoder_model, fingerprint_type, thr
     pred_feat = np.where(results > 0.5, 1, 0)
     
     flag = True
+    min_sim = 1.1
+    
     for i in range(len(feat)):
         sim = calc_sim(feat[i], pred_feat[i])
-        if sim < threshold:
-            flag = False
-    return flag
+        if sim < min_sim:
+            min_sim = sim
+            
+        #if sim < threshold:
+        #    flag = False
+    #return flag
+    return min_sim
 
 def read_smiles(smiles_input):
     smiles_list = []
