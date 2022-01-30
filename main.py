@@ -120,14 +120,17 @@ if __name__ == '__main__':
     fp = open(output_file, 'w')
     fp.write('%s\t%s\t%s\t%s\t%s\n'%('Smiles', 'ECFP4', 'MACCS', 'Daylight', 'PubChem'))
     for smiles in tqdm.tqdm(smiles_list):
-        result_info = {}
-        for each_model in models:
-            loaded_encoder_model = models[each_model]
-            flag = func(smiles, loaded_encoder_model, each_model, threshold)
-            result_info[each_model] = flag
-        
-        flag_list = []
-        for each_model in ['ecfp', 'maccs', 'daylight', 'pubchem']:
-            flag_list.append(str(result_info[each_model]))
+        try:
+            result_info = {}
+            for each_model in models:
+                loaded_encoder_model = models[each_model]
+                flag = func(smiles, loaded_encoder_model, each_model, threshold)
+                result_info[each_model] = flag
+
+            flag_list = []
+            for each_model in ['ecfp', 'maccs', 'daylight', 'pubchem']:
+                flag_list.append(str(result_info[each_model]))
+        except:
+            continue
         fp.write('%s\t%s\n'%(smiles, '\t'.join(flag_list)))    
     fp.close()
