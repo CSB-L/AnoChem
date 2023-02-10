@@ -2,9 +2,11 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 import numpy as np
 import pandas as pd
+import pickle
 import argparse
 import scaffoldgraph as sg
-from PyFingerprint.All_Fingerprint import get_fingerprint
+#from PyFingerprint.All_Fingerprint import get_fingerprint
+from PyFingerprint.fingerprint import get_fingerprint
 
 def argument_parser():
     parser = argparse.ArgumentParser()    
@@ -34,35 +36,41 @@ def calculate_ecfp_fingerprints(smiles_list):
 def calculate_daylight_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
-        fps = get_fingerprint(smi, fp_type='daylight')
-        bits = to_bits(fps, 1024)
-        feat = []
-        for f in bits:
-            feat.append(int(f))
-        feat_list.append(feat)
-    return np.asarray(feat_list)
+        fps = get_fingerprint(smi, fp_type='standard')
+        feat_list.append(fps.to_numpy().reshape(1,-1))
+#         bits = to_bits(fps, 1024)
+#         feat = []
+#         for f in bits:
+#             feat.append(int(f))
+#         feat_list.append(feat)
+#     return np.asarray(feat_list)
+    return np.concatenate(feat_list,axis=0)
 
 def calculate_pubchem_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
         fps = get_fingerprint(smi, fp_type='pubchem')
-        bits = to_bits(fps, 881)
-        feat = []
-        for f in bits:
-            feat.append(int(f))
-        feat_list.append(feat)
-    return np.asarray(feat_list)
+        feat_list.append(fps.to_numpy().reshape(1,-1))
+#         bits = to_bits(fps, 881)
+#         feat = []
+#         for f in bits:
+#             feat.append(int(f))
+#         feat_list.append(feat)
+#     return np.asarray(feat_list)
+    return np.concatenate(feat_list,axis=0)
 
 def calculate_maccs_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
         fps = get_fingerprint(smi, fp_type='maccs')
-        bits = to_bits(fps, 166)
-        feat = []
-        for f in bits:
-            feat.append(int(f))
-        feat_list.append(feat)
-    return np.asarray(feat_list)
+        feat_list.append(fps.to_numpy().reshape(1,-1))
+#         bits = to_bits(fps, 166)
+#         feat = []
+#         for f in bits:
+#             feat.append(int(f))
+#         feat_list.append(feat)
+#     return np.asarray(feat_list)
+    return np.concatenate(feat_list,axis=0)
 
 def get_scaffolds(smi):
     mol = Chem.MolFromSmiles(smi)
@@ -72,3 +80,10 @@ def get_scaffolds(smi):
         smiles = Chem.MolToSmiles(mol)
         frags_smiles.append(smiles)
     return frags_smiles
+
+
+def load_rf(model_f):
+    with open(model_f,'rb') as f:
+        model = pickle.load(f)
+    return model
+    
