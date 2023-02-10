@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 import warnings
 import numpy as np
-from tensorflow.keras.models import model_from_json 
+import pandas as pd
+from tensorflow.keras.models import model_from_json
 from numpy import dot
 from numpy.linalg import norm
 from scipy.spatial import distance
@@ -11,6 +13,7 @@ import glob
 import subprocess
 
 warnings.filterwarnings("ignore")
+PLF_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def calc_sim(original_feat, pred_feat):
     cos_sim = dot(original_feat, pred_feat)/(norm(original_feat)*norm(pred_feat))
@@ -82,9 +85,16 @@ def read_smiles(smiles_input):
 #     flag = check_structure_scaffold(smiles, loaded_encoder_model)
 #     return flag
 
-def run_chemprop(output_dir):
-    subprocess.call('chemprop_predict --test_path %s/fingerprint_result.csv --checkpoint_dir models/Scaffold_config_save --preds_path %s/final_result.csv --features_generator rdkit_2d_normalized --no_features_scaling --ensemble_variance'%(output_dir, output_dir), shell=True, stderr=subprocess.STDOUT)
-    return
+
+def run_classification(smiles_input:list,model):
+    feats = utils.calculate_ecfp_fingerprints(smiles_input)
+    _p = model.predict_proba(feats)
+    return _p[:,1].squeeze() # p.shape = (n(feats),label), label 1 is real
+
+
+# def run_chemprop(output_dir):
+#     subprocess.call('chemprop_predict --test_path %s/fingerprint_result.csv --checkpoint_dir models/Scaffold_config_save --preds_path %s/final_result.csv --features_generator rdkit_2d_normalized --no_features_scaling --ensemble_variance'%(output_dir, output_dir), shell=True, stderr=subprocess.STDOUT)
+#     return
 
 if __name__ == '__main__':
     parser = utils.argument_parser()    
@@ -95,13 +105,11 @@ if __name__ == '__main__':
     threshold = 0.8
     models = {}
     
-    try:
-        os.mkdir(output_dir)
-    except:
-        pass
+    os.makedirs(output_dir,exist_ok=True)
     
+    # Call anomaly detection models
     if not scaffold_flag:
-        folders = glob.glob('./models/original_*')
+        folders = glob.glob(os.path.join(PLF_DIR,'./models/original_*'))
         for each_folder in folders:
             basename = os.path.basename(each_folder).split('_')[1].strip()
             model_json = glob.glob(each_folder+'/*.json')[0]
@@ -116,7 +124,7 @@ if __name__ == '__main__':
             
         func = check_structure_original
     else:
-        folders = glob.glob('./models/scaffold_*')
+        folders = glob.glob(os.path.join(PLF_DIR,'./models/scaffold_*'))
         for each_folder in folders:
             basename = os.path.basename(each_folder).split('_')[1].strip()
             model_json = glob.glob(each_folder+'/*.json')[0]
@@ -152,5 +160,28 @@ if __name__ == '__main__':
             
     fp.close()
     
-    run_chemprop(output_dir)
+    # Call classification/ensemble models
+    cls_model_f = os.path.join(os.path.split(os.path.abspath(__file__))[0],'models/rfs/cls.pkl')
+    cls_model = utils.load_rf(model_f=cls_model_f)
     
+    # Classification
+    cls_ps = run_classification(smiles_input=smiles_list,model=cls_model)
+    cls_report_df = pd.DataFrame([cls_ps],columns=smiles_list,index=['RF_cls_prob']).T
+    cls_report_df.index.name='Smiles'
+    cls_report_df.to_csv(os.path.join(output_dir,'classficiation_probability.csv'))
+    
+    # Ensemble
+#     ensb_model_f = glob.glob(os.path.join(PLF_DIR,'./models/rfs/ensb.pkl'))
+#     ensb_model = utils.load_rf(model_f=ensb_model_f)
+    ano_prop_df = pd.read_csv(os.path.join(output_dir,'fingerprint_result.csv'),index_col=0)
+    ensb_input_df = pd.concat([ano_prop_df,cls_report_df],axis=1)
+#     ensb_ps = ensb_model.predict_proba(np.array(ensb_input_df))[:,1].squeeze()
+#     ensb_ps_df = pd.DataFrame([ensb_ps],columns=smiles_list,index='AnoChem_Final_Score').T
+#     final_result = pd.concat([ensb_input_df,ensb_ps_df],axis=1)
+    
+#     final_result.to_csv(os.path.join(output_dir,'results.csv'))
+    
+#     run_chemprop(output_dir)
+    
+    # TODO-remove here
+    ensb_input_df.to_csv(os.path.join(output_dir,'_ensemble_input.tsv'),sep='\t')
