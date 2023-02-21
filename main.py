@@ -143,25 +143,39 @@ if __name__ == '__main__':
     
     fp = open(output_dir+'/fingerprint_result.csv', 'w')
     fp.write('%s,%s,%s,%s,%s\n'%('Smiles', 'ECFP4', 'MACCS', 'Daylight', 'PubChem'))
+    fp_err = open(os.path.join(output_dir,'fingerprint_errored.tsv'),'w')
+    fp_err.write('Smiles\tError\n')
     for smiles in tqdm.tqdm(smiles_list):
         try:
             result_info = {}
             for each_model in models:
-                loaded_encoder_model = models[each_model]
-                flag = func(smiles, loaded_encoder_model, each_model, threshold)
+#                 loaded_encoder_model = models[each_model]
+#                 flag = func(smiles, loaded_encoder_model, each_model, threshold)
+                flag = func(smiles, models[each_model], each_model, threshold)
                 result_info[each_model] = flag
 
             flag_list = []
             for each_model in ['ecfp', 'maccs', 'daylight', 'pubchem']:
                 flag_list.append(str(result_info[each_model]))
             fp.write('%s,%s\n'%(smiles, ','.join(flag_list)))
-        except:
+        except Exception as e:
+            fp_err.write(f'{smiles}\t{e}\n')
             continue
             
     fp.close()
+    fp_err.close()
     
     # Call classification/ensemble models
+    
+    
     cls_model_f = os.path.join(os.path.split(os.path.abspath(__file__))[0],'models/rfs/cls.pkl')
+    # TODO-remove from here
+    cls_model_f = '/BiO/home/cdgu/Winery/tasting/anochem/data/RF_feature_importance-similar_dataset/over06/RF_model.over06.paired.hyperopted.pkl' # cls model - hyperparam optimized
+#     cls_model_f = '/BiO/home/cdgu/Winery/tasting/anochem/data/RF_feature_importance-similar_dataset/over06/RF_model.over06.paired.hyperparam_selected.pkl' # cls model - hyperparam optimized
+    if options.classifier_model:
+        if os.path.isfile(options.classifier_model):
+            cls_model_f = options.classifier_model
+    # TODO-to here
     cls_model = utils.load_rf(model_f=cls_model_f)
     
     # Classification
@@ -171,17 +185,42 @@ if __name__ == '__main__':
     cls_report_df.to_csv(os.path.join(output_dir,'classficiation_probability.csv'))
     
     # Ensemble
-#     ensb_model_f = glob.glob(os.path.join(PLF_DIR,'./models/rfs/ensb.pkl'))
-#     ensb_model = utils.load_rf(model_f=ensb_model_f)
     ano_prop_df = pd.read_csv(os.path.join(output_dir,'fingerprint_result.csv'),index_col=0)
     ensb_input_df = pd.concat([ano_prop_df,cls_report_df],axis=1)
-#     ensb_ps = ensb_model.predict_proba(np.array(ensb_input_df))[:,1].squeeze()
-#     ensb_ps_df = pd.DataFrame([ensb_ps],columns=smiles_list,index='AnoChem_Final_Score').T
-#     final_result = pd.concat([ensb_input_df,ensb_ps_df],axis=1)
-    
-#     final_result.to_csv(os.path.join(output_dir,'results.csv'))
-    
-#     run_chemprop(output_dir)
-    
     # TODO-remove here
     ensb_input_df.to_csv(os.path.join(output_dir,'_ensemble_input.tsv'),sep='\t')
+    
+    # Dropping null
+    ensb_input_nadroped = ensb_input_df.dropna()
+    
+    ensb_model_f = glob.glob(os.path.join(PLF_DIR,'./models/rfs/ensb.pkl'))
+    if options.ensemble_model:
+        if os.path.isfile(options.ensemble_model):
+            ensb_model_f = options.ensemble_model
+            ensb_model = utils.load_rf(model_f=ensb_model_f)
+            ensb_ps = ensb_model.predict_proba(np.array(ensb_input_nadroped))[:,1].squeeze()
+            ensb_ps_df = pd.DataFrame([ensb_ps],columns=smiles_list,index=['AnoChem_Final_Score']).T
+            ensb_ps_df.to_csv(os.path.join(output_dir,'final_score.csv'))
+            final_report = pd.concat([ensb_input_df,ensb_ps_df],axis=1)
+            
+            
+            final_report.to_csv(os.path.join(output_dir,'final_report.csv'))
+            
+
+            # TODO - remove here : calculation of model performance
+            if options.y_label: # .npy file
+                if os.path.isfile(options.y_label):
+                    import calc_metrics
+                    import json
+                    y_true = np.load(options.y_label)
+                    # if null dropped
+#                     if set(ensb_input_df.index) != set(ensb_input_nadroped.index):
+                    valid_idx = [i in ensb_input_nadroped.index for i in ensb_input_df.index]
+                    y_true = y_true[valid_idx]
+                    assert y_true.shape == y_pred.shape
+                    perform_dict = calc_metrics.calc_model_performance(
+                        y_true=y_true,y_pred=ensb_ps)
+                    with open(os.path.join(output_dir,'AnoChem_Performance.json'),'wb') as f:
+                        f.write(json.dumps(perform_dict).encode())
+            
+    
