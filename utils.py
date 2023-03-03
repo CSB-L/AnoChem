@@ -7,6 +7,7 @@ import argparse
 import scaffoldgraph as sg
 #from PyFingerprint.All_Fingerprint import get_fingerprint
 from PyFingerprint.fingerprint import get_fingerprint
+import tensorflow as tf
 
 def argument_parser():
     parser = argparse.ArgumentParser()    
@@ -98,4 +99,14 @@ def load_rf(model_f):
     with open(model_f,'rb') as f:
         model = pickle.load(f)
     return model
+    
+    
+def load_dnn(model_f):
+    model = tf.keras.models.load_model(model_f,compile=False)
+    bce = tf.keras.losses.BinaryCrossentropy()
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-4)
+    model.compile(optimizer=opt,loss=bce,metrics=['accuracy',bce])
+    
+    return model
+    
     
