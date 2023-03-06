@@ -102,20 +102,6 @@ def read_smiles(smiles_input):
             smiles_list.append(line.strip())
     return smiles_list
 
-# def predict(smiles):
-#     model_json = './models/scaffold/256_1_0.001.json'
-#     model_weight = './models/scaffold/256_1_0.001.h5'
-    
-#     json_file = open(model_json, "r")
-#     loaded_model_json = json_file.read() 
-#     json_file.close()
-    
-#     loaded_encoder_model = model_from_json(loaded_model_json)
-#     loaded_encoder_model.load_weights(model_weight)
-    
-#     flag = check_structure_scaffold(smiles, loaded_encoder_model)
-#     return flag
-
 
 def _run_rf_cls(ecfp4_fing:'np.array',model):
     _p = model.predict_proba(ecfp4_fing)
@@ -193,39 +179,12 @@ if __name__ == '__main__':
         'ecfp':'ECFP4', 'maccs':'MACCS', 'daylight':'Daylight', 'pubchem':'PubChem'},axis=1)
     strc_result.to_csv(output_dir+'/fingerprint_result.csv')
     
-#     fp = open(output_dir+'/fingerprint_result.csv', 'w')
-#     fp.write('%s,%s,%s,%s,%s\n'%('Smiles', 'ECFP4', 'MACCS', 'Daylight', 'PubChem'))
-#     fp_err = open(os.path.join(output_dir,'fingerprint_errored.tsv'),'w')
-#     fp_err.write('Smiles\tError\n')
-#     for smiles in tqdm.tqdm(smiles_list):
-#         try:
-#             result_info = {}
-#             for each_model in models:
-# #                 loaded_encoder_model = models[each_model]
-# #                 flag = func(smiles, loaded_encoder_model, each_model, threshold)
-#                 flag = func(smiles, models[each_model], each_model, threshold)
-#                 result_info[each_model] = flag
-
-#             flag_list = []
-#             for each_model in ['ecfp', 'maccs', 'daylight', 'pubchem']:
-#                 flag_list.append(str(result_info[each_model]))
-#             fp.write('%s,%s\n'%(smiles, ','.join(flag_list)))
-#         except Exception as e:
-#             fp_err.write(f'{smiles}\t{e}\n')
-#             continue
-            
-#     fp.close()
-#     fp_err.close()
-    
     # Call classification/ensemble models
     print('Under real/generated classification...')
     cls_dnn_model_f = os.path.join(PLF_DIR,'models/classification/cls_dnn.hdf5')
     cls_rf_model_f = os.path.join(PLF_DIR,'models/classification/cls_rf.pkl')
     
-#     if options.classifier_model:
-#         if os.path.isfile(options.classifier_model):
-#             rf_cls_model = options.classifier_model
-    # TODO-to here
+    # Call classification models
     dnn_cls_model = utils.load_dnn(model_f=cls_dnn_model_f)
     rf_cls_model = utils.load_rf(model_f=cls_rf_model_f)
 
@@ -245,39 +204,25 @@ if __name__ == '__main__':
     # TODO-remove here
     ensb_input_df.to_csv(os.path.join(output_dir,'_ensemble_input.tsv'),sep='\t')
     
-#     # Dropping null
-#     ensb_input_nadroped = ensb_input_df.dropna()
+    # Dropping null
+    _ensb_input_refined = ensb_input_df.dropna()
+#     _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob','RF_cls_prob']] # without RF_cls_prob
+    _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob']] # without RF_cls_prob
     
-#     ensb_model_f = glob.glob(os.path.join(PLF_DIR,'./models/ensemble/ensb.pkl'))
-#     if options.ensemble_model:
-#         if os.path.isfile(options.ensemble_model):
-#             ensb_model_f = options.ensemble_model
-#             ensb_model = utils.load_rf(model_f=ensb_model_f)
-#             ensb_ps = ensb_model.predict_proba(np.array(ensb_input_nadroped))[:,1].squeeze()
-#             ensb_ps_df = pd.DataFrame([ensb_ps],columns=smiles_list,index=['AnoChem_Final_Score']).T
-#             ensb_ps_df.to_csv(os.path.join(output_dir,'final_score.csv'))
-#             final_report = pd.concat([ensb_input_df,ensb_ps_df],axis=1)
-            
-            
-#             final_report.to_csv(os.path.join(output_dir,'final_report.csv'))
-            
-
-#             # TODO - remove here : calculation of model performance
-#             if options.y_label: # .npy file
-#                 if os.path.isfile(options.y_label):
-#                     import calc_metrics
-#                     import json
-#                     y_true = np.load(options.y_label)
-#                     # if null dropped
-# #                     if set(ensb_input_df.index) != set(ensb_input_nadroped.index):
-#                     valid_idx = [i in ensb_input_nadroped.index for i in ensb_input_df.index]
-#                     y_true = y_true[valid_idx]
-#                     assert y_true.shape == y_pred.shape
-#                     perform_dict = calc_metrics.calc_model_performance(
-#                         y_true=y_true,y_pred=ensb_ps)
-#                     with open(os.path.join(output_dir,'AnoChem_Performance.json'),'wb') as f:
-#                         f.write(json.dumps(perform_dict).encode())
-            
+    ensb_model_f = os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl')
+    if not os.path.isfile(ensb_model_f):
+        if os.path.isfile(os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl.gz')):
+            os.system("gzip -dk %s"%os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl.gz'))
+        else:
+            raise(IOError('Cannot find ensemble model'))
+    ensb_model = utils.load_rf(model_f=ensb_model_f)
+    ensb_ps = ensb_model.predict_proba(np.array(_ensb_input_refined))[:,1].squeeze()
+    ensb_ps_df = pd.DataFrame([ensb_ps],columns=_ensb_input_refined.index,index=['AnoChem_Final_Score']).T
+    ensb_ps_df.to_csv(os.path.join(output_dir,'anochem_score.csv'))
+    
+    final_report = pd.concat([ensb_input_df.dropna(axis=0),ensb_ps_df],axis=1)
+    final_report.dropna(axis=0).to_csv(os.path.join(output_dir,'final_report.csv'))
+    
     end = datetime.datetime.now()
     print('Time cost:', end-start)
     
