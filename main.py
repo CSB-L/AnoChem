@@ -45,56 +45,6 @@ def check_structure_original(smiles_list:list,
 #     sim = calc_sim(feat[0], pred_feat[0])
     return pd.Series(sims,index=smiles_list)
 
-
-def check_structure_scaffold(smiles_list:list,
-                             loaded_encoder_model,
-                             fingerprint_type:str,
-                             threshold:float,
-                            )->'pd.Series':
-    smi_to_frag = {_smi:utils.get_scaffolds(_smi) for _smi in smiles_list} #{SMILES:FRAG_LIST}
-    smi_frags = []
-    smi_idx = {}
-    curr_idx = 0
-    for _smi in smiles_list:
-        frags = smi_to_frag[_smi]
-        smi_frags.append(_smi)
-        smi_frags.extend(frags)
-        
-        _frag_n = len(frags)
-        _next_idx = curr_idx+_frag_n+1
-        smi_idx[_smi] = (curr_idx,_next_idx)
-        curr_idx = _next_idx
-
-    if fingerprint_type == 'ecfp':
-        feat = utils.calculate_ecfp_fingerprints(smi_frags)
-    elif fingerprint_type == 'maccs':
-        feat = utils.calculate_maccs_fingerprints(smi_frags)
-    elif fingerprint_type == 'daylight':
-        feat = utils.calculate_daylight_fingerprints(smi_frags)
-    elif fingerprint_type == 'pubchem':
-        feat = utils.calculate_pubchem_fingerprints(smi_frags)
-    results = loaded_encoder_model.predict(feat)
-    pred_feat = np.where(results > 0.5, 1, 0)
-    
-#     flag = True
-#     min_sim = 1.0
-    sims = {}
-    for _smi in smiles_list:
-        sim_list = [calc_sim(feat[k,:], pred_feat[k,:]) for k in range(smi_idx[_smi][0],smi_idx[_smi][1],1)]
-#         for i in range(len(feat)):
-#             sim = calc_sim(feat[i], pred_feat[i])
-#             sim_list.append(sim)
-#             if sim < min_sim:
-#                 min_sim = sim
-
-            #if sim < threshold:
-            #    flag = False
-        #return flag
-        sims[_smi] = np.min(sim_list)
-#     return np.min(sim_list)
-    return pd.Series(sims,index=smiles_list)
-
-
 def read_smiles(smiles_input):
     smiles_list = []
     with open(smiles_input, 'r') as fp:
@@ -115,55 +65,33 @@ def get_feats(smiles_input:list):
     feats = utils.calculate_ecfp_fingerprints(smiles_input)
     return feats
 
-
-# def run_chemprop(output_dir):
-#     subprocess.call('chemprop_predict --test_path %s/fingerprint_result.csv --checkpoint_dir models/Scaffold_config_save --preds_path %s/final_result.csv --features_generator rdkit_2d_normalized --no_features_scaling --ensemble_variance'%(output_dir, output_dir), shell=True, stderr=subprocess.STDOUT)
-#     return
-
 if __name__ == '__main__':
     start = datetime.datetime.now()
     parser = utils.argument_parser()    
     options = parser.parse_args()
     smiles_input = options.smiles_input
     output_dir = options.output_dir    
-    scaffold_flag = options.scaffold_flag
     threshold = 0.8
     models = {}
     
     os.makedirs(output_dir,exist_ok=True)
     
     # Call anomaly detection models
-    if not scaffold_flag:
-        folders = glob.glob(os.path.join(PLF_DIR,'./models/original_*'))
-        for each_folder in folders:
-            basename = os.path.basename(each_folder).split('_')[1].strip()
-            model_json = glob.glob(each_folder+'/*.json')[0]
-            model_weight = glob.glob(each_folder+'/*.h5')[0]
-            
-            json_file = open(model_json, "r")
-            loaded_model_json = json_file.read() 
-            json_file.close()
-            loaded_encoder_model = model_from_json(loaded_model_json)
-            loaded_encoder_model.load_weights(model_weight)
-            models[basename] = loaded_encoder_model
-            
-        func = check_structure_original
-    else:
-        folders = glob.glob(os.path.join(PLF_DIR,'./models/scaffold_*'))
-        for each_folder in folders:
-            basename = os.path.basename(each_folder).split('_')[1].strip()
-            model_json = glob.glob(each_folder+'/*.json')[0]
-            model_weight = glob.glob(each_folder+'/*.h5')[0]
-            
-            json_file = open(model_json, "r")
-            loaded_model_json = json_file.read() 
-            json_file.close()
-            loaded_encoder_model = model_from_json(loaded_model_json)
-            loaded_encoder_model.load_weights(model_weight)
-            models[basename] = loaded_encoder_model
-            
-        func = check_structure_scaffold
-    
+    folders = glob.glob(os.path.join(PLF_DIR,'./models/original_*'))
+    for each_folder in folders:
+        basename = os.path.basename(each_folder).split('_')[1].strip()
+        model_json = glob.glob(each_folder+'/*.json')[0]
+        model_weight = glob.glob(each_folder+'/*.h5')[0]
+        
+        json_file = open(model_json, "r")
+        loaded_model_json = json_file.read() 
+        json_file.close()
+        loaded_encoder_model = model_from_json(loaded_model_json)
+        loaded_encoder_model.load_weights(model_weight)
+        models[basename] = loaded_encoder_model
+        
+    func = check_structure_original
+
     smiles_list = read_smiles(smiles_input)
     
     strc_result = []

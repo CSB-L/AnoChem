@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pickle
 import argparse
-import scaffoldgraph as sg
 #from PyFingerprint.All_Fingerprint import get_fingerprint
 from PyFingerprint.fingerprint import get_fingerprint
 import tensorflow as tf
@@ -13,7 +12,6 @@ def argument_parser():
     parser = argparse.ArgumentParser()    
     parser.add_argument('-o', '--output_dir', required=True, help="Output directory")
     parser.add_argument('-i', '--smiles_input', required=True, help="Input Entrez gene ID")
-    parser.add_argument('-s', '--scaffold_flag', required=False, help="Domain change flag", action='store_true')
     
     return parser
 
@@ -73,16 +71,6 @@ def calculate_maccs_fingerprints(smiles_list):
 #         feat_list.append(feat)
 #     return np.asarray(feat_list)
     return np.concatenate(feat_list,axis=0)
-
-def get_scaffolds(smi):
-    mol = Chem.MolFromSmiles(smi)
-    frags = sg.get_all_murcko_fragments(mol, break_fused_rings=False)
-    frags_smiles = []
-    for mol in frags:
-        smiles = Chem.MolToSmiles(mol)
-        frags_smiles.append(smiles)
-    return frags_smiles
-
 
 def load_rf(model_f):
     with open(model_f,'rb') as f:
