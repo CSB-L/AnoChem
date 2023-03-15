@@ -34,16 +34,29 @@ def check_structure_original(smiles_list:list,
         feat = utils.calculate_daylight_fingerprints(smiles_list)
     elif fingerprint_type == 'pubchem':
         feat = utils.calculate_pubchem_fingerprints(smiles_list)
-    
-    results = loaded_encoder_model.predict(feat)
+    # dropping errored smiles
+    _feat_dropped_df = pd.DataFrame(feat,index=smiles_list).dropna()
+    _feat_dropped_val = np.array(_feat_dropped_df.values)
+    results = loaded_encoder_model.predict(_feat_dropped_val)
     pred_feat = np.where(results > 0.5, 1, 0)
     
     sims = []
     for _ in range(results.shape[0]):
-        sims.append(calc_sim(feat[_,:], pred_feat[_,:]))
+        sims.append(calc_sim(_feat_dropped_val[_,:], pred_feat[_,:]))
+    sims_d = pd.Series(sims,index=_feat_dropped_df.index).to_dict()
+    return pd.Series(sims_d,index=smiles_list)
+
+    # OLD
+    # 
+#     results = loaded_encoder_model.predict(feat)
+#     pred_feat = np.where(results > 0.5, 1, 0)
     
-#     sim = calc_sim(feat[0], pred_feat[0])
-    return pd.Series(sims,index=smiles_list)
+#     sims = []
+#     for _ in range(results.shape[0]):
+#         sims.append(calc_sim(feat[_,:], pred_feat[_,:]))
+    
+# #     sim = calc_sim(feat[0], pred_feat[0])
+#     return pd.Series(sims,index=smiles_list)
 
 def read_smiles(smiles_input):
     smiles_list = []
@@ -93,6 +106,9 @@ if __name__ == '__main__':
     func = check_structure_original
 
     smiles_list = read_smiles(smiles_input)
+    # check duplicated smiles
+    print("Duplication of input SMILES: ",len(smiles_list)-len(set(smiles_list)))
+    smiles_list = list(set(smiles_list))
     
     strc_result = []
     print('Calculating structure-based recovery...')
@@ -118,12 +134,18 @@ if __name__ == '__main__':
 
     # Featurization
     feats = get_feats(smiles_input=smiles_list)
+        # null_drop
+    feats_df = pd.DataFrame(feats, index=smiles_list)
+    feats_null_dropped = feats_df.dropna()
     
     # Classification
-    dnn_cls_ps = _run_dnn_cls(ecfp4_fing=feats,model=dnn_cls_model)
-    rf_cls_ps = _run_rf_cls(ecfp4_fing=feats,model=rf_cls_model)
+    dnn_cls_ps = _run_dnn_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=dnn_cls_model)
+    rf_cls_ps = _run_rf_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=rf_cls_model)
     
-    cls_report_df = pd.DataFrame([dnn_cls_ps.reshape(-1,),rf_cls_ps.reshape(-1,)],columns=smiles_list,index=['DNN_cls_prob','RF_cls_prob']).T
+    cls_report_df = pd.DataFrame([dnn_cls_ps.reshape(-1,),rf_cls_ps.reshape(-1,)],
+                                 columns=feats_null_dropped.index,index=['DNN_cls_prob','RF_cls_prob']).T
+    cls_report_df = pd.DataFrame(cls_report_df,index=smiles_list)
+#     cls_report_df = pd.DataFrame([dnn_cls_ps.reshape(-1,),rf_cls_ps.reshape(-1,)],columns=smiles_list,index=['DNN_cls_prob','RF_cls_prob']).T
     cls_report_df.index.name='Smiles'
     cls_report_df.to_csv(os.path.join(output_dir,'classficiation_probability.csv'))
     
@@ -148,8 +170,10 @@ if __name__ == '__main__':
     ensb_ps_df = pd.DataFrame([ensb_ps],columns=_ensb_input_refined.index,index=['AnoChem_Final_Score']).T
     ensb_ps_df.to_csv(os.path.join(output_dir,'anochem_score.csv'))
     
-    final_report = pd.concat([ensb_input_df.dropna(axis=0),ensb_ps_df],axis=1)
-    final_report.dropna(axis=0).to_csv(os.path.join(output_dir,'final_report.csv'))
+    final_report = pd.concat([ensb_input_df,ensb_ps_df],axis=1)
+    final_report.to_csv(os.path.join(output_dir,'final_report.csv'))
+#     final_report = pd.concat([ensb_input_df.dropna(axis=0),ensb_ps_df],axis=1)
+#     final_report.dropna(axis=0).to_csv(os.path.join(output_dir,'final_report.csv'))
     
     end = datetime.datetime.now()
     print('Time cost:', end-start)

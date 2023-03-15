@@ -11,7 +11,7 @@ import tensorflow as tf
 def argument_parser():
     parser = argparse.ArgumentParser()    
     parser.add_argument('-o', '--output_dir', required=True, help="Output directory")
-    parser.add_argument('-i', '--smiles_input', required=True, help="Input Entrez gene ID")
+    parser.add_argument('-i', '--smiles_input', required=True, help="Input file with SMILES")
     
     return parser
 
@@ -24,52 +24,46 @@ def to_bits(data, bitlen):
 def calculate_ecfp_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
-        mol = Chem.MolFromSmiles(smi)
-        fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
-        bits = fp.ToBitString()
-        feat = []
-        for f in bits:
-            feat.append(int(f))
-        feat_list.append(feat)
+        try:
+            mol = Chem.MolFromSmiles(smi)
+            fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
+            bits = fp.ToBitString()
+            feat = []
+            for f in bits:
+                feat.append(int(f))
+            feat_list.append(feat)
+        except:
+            feat_list.append(np.array([float('nan')]*2048))
     return np.asarray(feat_list)
 
 def calculate_daylight_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
-        fps = get_fingerprint(smi, fp_type='standard')
-        feat_list.append(fps.to_numpy().reshape(1,-1))
-#         bits = to_bits(fps, 1024)
-#         feat = []
-#         for f in bits:
-#             feat.append(int(f))
-#         feat_list.append(feat)
-#     return np.asarray(feat_list)
+        try:
+            fps = get_fingerprint(smi, fp_type='standard')
+            feat_list.append(fps.to_numpy().reshape(1,-1))
+        except:
+            feat_list.append(np.array([float('nan')]*1024).reshape(1,-1))
     return np.concatenate(feat_list,axis=0)
 
 def calculate_pubchem_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
-        fps = get_fingerprint(smi, fp_type='pubchem')
-        feat_list.append(fps.to_numpy().reshape(1,-1))
-#         bits = to_bits(fps, 881)
-#         feat = []
-#         for f in bits:
-#             feat.append(int(f))
-#         feat_list.append(feat)
-#     return np.asarray(feat_list)
+        try:
+            fps = get_fingerprint(smi, fp_type='pubchem')
+            feat_list.append(fps.to_numpy().reshape(1,-1))
+        except:
+            feat_list.append(np.array([float('nan')]*881).reshape(1,-1))
     return np.concatenate(feat_list,axis=0)
 
 def calculate_maccs_fingerprints(smiles_list): 
     feat_list = []
     for smi in smiles_list:
-        fps = get_fingerprint(smi, fp_type='maccs')
-        feat_list.append(fps.to_numpy().reshape(1,-1))
-#         bits = to_bits(fps, 166)
-#         feat = []
-#         for f in bits:
-#             feat.append(int(f))
-#         feat_list.append(feat)
-#     return np.asarray(feat_list)
+        try:
+            fps = get_fingerprint(smi, fp_type='maccs')
+            feat_list.append(fps.to_numpy().reshape(1,-1))
+        except:
+            feat_list.append(np.array([float('nan')]*166).reshape(1,-1))
     return np.concatenate(feat_list,axis=0)
 
 def load_rf(model_f):
