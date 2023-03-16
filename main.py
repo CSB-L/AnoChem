@@ -46,17 +46,6 @@ def check_structure_original(smiles_list:list,
     sims_d = pd.Series(sims,index=_feat_dropped_df.index).to_dict()
     return pd.Series(sims_d,index=smiles_list)
 
-    # OLD
-    # 
-#     results = loaded_encoder_model.predict(feat)
-#     pred_feat = np.where(results > 0.5, 1, 0)
-    
-#     sims = []
-#     for _ in range(results.shape[0]):
-#         sims.append(calc_sim(feat[_,:], pred_feat[_,:]))
-    
-# #     sim = calc_sim(feat[0], pred_feat[0])
-#     return pd.Series(sims,index=smiles_list)
 
 def read_smiles(smiles_input):
     smiles_list = []
@@ -156,10 +145,10 @@ if __name__ == '__main__':
     
     # Dropping null
     _ensb_input_refined = ensb_input_df.dropna()
-#     _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob','RF_cls_prob']] # without RF_cls_prob
-    _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob']] # without RF_cls_prob
+    _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob','RF_cls_prob']] # without RF_cls_prob
+#     _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob']] # without RF_cls_prob
     
-    ensb_model_f = os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl')
+    ensb_model_f = os.path.join(PLF_DIR,'models/ensemble/ensemble_model.LR.pkl')
     if not os.path.isfile(ensb_model_f):
         if os.path.isfile(os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl.gz')):
             os.system("gzip -dk %s"%os.path.join(PLF_DIR,'models/ensemble/ensemble_model.pkl.gz'))
