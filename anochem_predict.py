@@ -12,6 +12,8 @@ import os
 import glob
 import subprocess
 import datetime
+import tempfile
+
 
 warnings.filterwarnings("ignore")
 PLF_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -118,7 +120,7 @@ def predict(smiles_list:list,
     strc_result = strc_result.rename({
         'ecfp':'ECFP4', 'maccs':'MACCS', 'daylight':'Daylight', 'pubchem':'PubChem'},axis=1)
     if save_tmp_reports:
-        strc_result.to_csv(output_dir+'/fingerprint_result.csv')
+        strc_result.to_csv(os.path.join(output_dir,'/fingerprint_result.csv'))
     
     # Call classification/ensemble models
     print('Under real/generated classification...')
@@ -177,7 +179,6 @@ def predict(smiles_list:list,
 
 # prediction function for web-version
 def _web_post_prediction_(smiles):
-    import tempfile
     temp_dir = tempfile.TemporaryDirectory()
     output_dir = temp_dir.name
     output_dir = output_dir+'/'
