@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import warnings
-import anochem_predict as predict
+import anochem_predict as pred_funcs
 import utils
 import datetime
 
@@ -16,8 +16,8 @@ if __name__ == '__main__':
     output_dir = options.output_dir    
     os.makedirs(output_dir, exist_ok=True)
     
-    smiles_list = predict.read_smiles(smiles_input)
-    result_df = predict.predict(smiles_list=smiles_list,
+    smiles_list = pred_funcs.read_smiles(smiles_input)
+    result_df = pred_funcs.predict(smiles_list=smiles_list,
                                 output_dir=output_dir,
                                 ensb_model_f=os.path.join(PLF_DIR,'models/ensemble/ensemble_model.LR.pkl'),
                                 ensemble_with_RF=True,

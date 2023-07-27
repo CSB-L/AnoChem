@@ -69,11 +69,13 @@ def get_fing_imgs(smiles:str,
                   show_dup_fing:bool=True,
                   max_fing_n=5,
                   show_image:bool=False,
+                  img_str_prfx:str="data:image/png;base64,",
                  ):
     # image size
     _whole_img_size = (600,600)
     _fing_img_size = (100,100)
-    _img_tmpl = "data:image/png;base64,"
+    _img_tmpl = img_str_prfx
+    #_img_tmpl = "data:image/png;base64,"
     
     # Create a molecule from a SMILES string
     mol = Chem.MolFromSmiles(smiles)
@@ -100,10 +102,11 @@ def get_fing_imgs(smiles:str,
     for _curr_fp in target_fp_l:
         fing_idx = f'ECFP4:{_curr_fp:04d}'
         if show_dup_fing:
-            _sub_img = Image.new('RGB',(0,0),color='#FFFFFF')
+            _sub_img = Image.new('RGB',(0,0),color='#FFFFFF') # Null image
             for _atom_no_tup in bi[_curr_fp]:
                 try:
                     _sub_bi_info = {_curr_fp:(_atom_no_tup,)}
+                    # Appending image
                     _sub_img = get_concat_v(
                         _sub_img,
                         Draw.DrawMorganBit(mol,_curr_fp,_sub_bi_info,molSize=_fing_img_size))
@@ -116,8 +119,6 @@ def get_fing_imgs(smiles:str,
                 _sub_img_str = _conv_img_to_base64(_sub_img)
             except:
                 continue
-            
-            
         _sub_img_str = _img_tmpl+_sub_img_str
         sub_img_l.append(tuple([fing_idx,_sub_img,_sub_img_str]))
         

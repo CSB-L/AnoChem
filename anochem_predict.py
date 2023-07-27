@@ -120,7 +120,7 @@ def predict(smiles_list:list,
     strc_result = strc_result.rename({
         'ecfp':'ECFP4', 'maccs':'MACCS', 'daylight':'Daylight', 'pubchem':'PubChem'},axis=1)
     if save_tmp_reports:
-        strc_result.to_csv(os.path.join(output_dir,'/fingerprint_result.csv'))
+        strc_result.to_csv(os.path.join(output_dir,'fingerprint_result.csv'))
     
     # Call classification/ensemble models
     print('Under real/generated classification...')
