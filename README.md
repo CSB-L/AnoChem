@@ -11,6 +11,10 @@ AnoChem is implemented with `conda` environment.
 
 `conda create -f environment.yml`
 
+Some dependencies are required for for manual installation:
+
+- `PyFingerprint` : Try installation via pip and git as described in the `install.sh`
+
 
 ## How to run
 
