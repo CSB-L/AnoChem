@@ -1,4 +1,5 @@
 import os
+import re
 from rdkit import Chem
 from rdkit.Chem import Draw
 from IPython.display import SVG
@@ -65,7 +66,7 @@ def get_master_img(smiles:str,show_atom_label=True,show_image=False):
     
     
 def get_fing_imgs(smiles:str,
-                  fing_prior_f:str=os.path.join(os.path.split(os.path.abspath(__file__))[0],'ecfp4_ranked_priority.txt'),
+                  fing_prior_f:str=os.path.join(os.path.split(os.path.abspath(__file__))[0],'assets','ecfp4_ranked_priority.txt'),
                   show_dup_fing:bool=True,
                   max_fing_n=5,
                   show_image:bool=False,
@@ -133,3 +134,31 @@ def get_fing_imgs(smiles:str,
             sub_img_d[_img_png_var] = fing_img_info[1]
     
     return sub_img_d
+
+
+def draw_sub_imgs(smiles:str,
+                  fing_prior_f:str=os.path.join(os.path.split(os.path.abspath(__file__))[0],'assets','ecfp4_ranked_priority.txt'),
+                  show_dup_fing:bool=True,
+                  max_fing_n=5,
+                  output_dir='./output',
+                  ):
+    output_d = os.path.abspath(output_dir)
+    os.makedirs(output_d,exist_ok=True)
+    
+    mst_img, _ = get_master_img(smiles=smiles,show_atom_label=True,show_image=True)
+    mst_img.save(os.path.join(output_d,'whole_image.png'))
+    
+    img_d = get_fing_imgs(
+        smiles=smiles,
+        fing_prior_f=fing_prior_f,
+        show_dup_fing=show_dup_fing,
+        max_fing_n=max_fing_n,
+        show_image=True,
+    )
+    for _idx in range(max_fing_n):
+        try:
+            o_f = os.path.join(output_d, f"candidate_{_idx:03d}."+re.sub('[\W]','_',img_d[f"candidate{_idx}_name"])+'.png')
+            _img = img_d[f'candidate{_idx}_img_png']
+            _img.save(o_f)
+        except:
+            continue
