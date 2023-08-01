@@ -4,6 +4,7 @@ import warnings
 import anochem_predict as pred_funcs
 import utils
 import datetime
+import sub_structure_drawing as sub_dr
 
 warnings.filterwarnings("ignore")
 PLF_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -24,6 +25,14 @@ if __name__ == '__main__':
                                 threshold=0.8,
                                 save_tmp_reports=False,
                                )
+    
+    if options.bit_image:
+        for _idx, _smi in enumerate(smiles_list):
+            img_d = sub_dr.draw_sub_imgs(
+                smiles=_smi,
+                max_fing_n=options.bit_image,
+                output_dir=os.path.join(output_dir,str(_idx)),
+            )
     
     end = datetime.datetime.now()
     print('Time cost:', end-start)

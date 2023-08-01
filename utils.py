@@ -10,8 +10,9 @@ import tensorflow as tf
 
 def argument_parser():
     parser = argparse.ArgumentParser()    
-    parser.add_argument('-o', '--output_dir', required=True, help="Output directory")
     parser.add_argument('-i', '--smiles_input', required=True, help="Input file with SMILES")
+    parser.add_argument('-o', '--output_dir', required=False, default='./results', help="Output directory. Default is \'results\' directory, which overwrite the original data if existed.")
+    parser.add_argument('-b', '--bit_image', default=0, type=int, help="Substructural images of the ECFP4 moleulcar bits to revise for the input SMILES. Default is 0")
     
     return parser
 
