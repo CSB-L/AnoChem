@@ -18,13 +18,13 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
     
     smiles_list = pred_funcs.read_smiles(smiles_input)
-    result_df = pred_funcs.predict(smiles_list=smiles_list,
-                                output_dir=output_dir,
-                                ensb_model_f=os.path.join(PLF_DIR,'models/ensemble/ensemble_model.LR.pkl'),
-                                ensemble_with_RF=True,
-                                threshold=0.8,
-                                save_tmp_reports=False,
-                               )
+    result_df = pred_funcs.predict(
+        smiles_list=smiles_list,
+        output_dir=output_dir,
+        ensb_model_f=os.path.join(PLF_DIR,'models/ensemble/LR_ensemble.best_model.pkl'),
+        threshold=0.8,
+        _calc_all_=options.calc_all,
+    )
     
     if options.bit_image:
         for _idx, _smi in enumerate(smiles_list):

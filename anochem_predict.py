@@ -57,11 +57,11 @@ def read_smiles(smiles_input):
     return smiles_list
 
 
-def _run_rf_cls(ecfp4_fing:'np.array',model):
+def _run_sklrn_cls(ecfp4_fing:'np.array',model):
     _p = model.predict_proba(ecfp4_fing)
     return _p[:,1].squeeze() # p.shape = (n(feats),label), label 1 is real
     
-def _run_dnn_cls(ecfp4_fing:'np.array',model):
+def _run_tf_cls(ecfp4_fing:'np.array',model):
     _p = model.predict(ecfp4_fing)
     return _p
 
@@ -72,10 +72,9 @@ def get_feats(smiles_input:list):
 
 def predict(smiles_list:list,
             output_dir:str,
-            ensb_model_f:str=os.path.join(PLF_DIR,'models/ensemble/ensemble_model.LR.pkl'),
-            ensemble_with_RF:bool=True,
+            ensb_model_f:str=os.path.join(PLF_DIR,'models/ensemble/LR_ensemble.best_model.pkl'),
             threshold:float=0.8,
-            save_tmp_reports=True,
+            _calc_all_:bool=False,
            ):
     """
     Main prediction
@@ -83,9 +82,7 @@ def predict(smiles_list:list,
     output_dir (str) : location of output directory
     NOTE that any exist files with a identic files would be overwritten
     ensb_model_f (str) : in case to specify an ensemble model file (there is an default model)
-    ensemble_with_RF (bool) : in case that ensemble model takes RF prob results (default is True)
-    threshold (float) : a threshold for anomaly de detection models
-    save_tmp_reports (bool) : save temporal score files
+    threshold (float) : a threshold for anomaly detection models
     """
     models = {}
     # Call anomaly detection models
@@ -108,28 +105,46 @@ def predict(smiles_list:list,
     print("Duplication of input SMILES: ",len(smiles_list)-len(set(smiles_list)))
     smiles_list = list(set(smiles_list))
     
+    # Molecular properties
+    mol_props_df = utils.get_molecular_prop(smiles_list=smiles_list)
+    mol_props_df.to_csv(os.path.join(output_dir,'molecular_properties.csv'))
+    
     strc_result = []
     print('Calculating structure-based recovery...')
-    for each_model in tqdm.tqdm(['ecfp', 'maccs', 'daylight', 'pubchem']):
+    if _calc_all_:
+        _fingerprints_ = ['ecfp', 'maccs', 'daylight', 'pubchem']
+    else:
+        _fingerprints_ = ['ecfp']
+    
+    for each_model in tqdm.tqdm(_fingerprints_):
         _result_ser = func(smiles_list,models[each_model],each_model,threshold)
         _result_ser.name = each_model
         _result_ser.index.name = 'Smiles'
         
         strc_result.append(_result_ser)
     strc_result = pd.concat(strc_result,axis=1)
-    strc_result = strc_result.rename({
-        'ecfp':'ECFP4', 'maccs':'MACCS', 'daylight':'Daylight', 'pubchem':'PubChem'},axis=1)
-    if save_tmp_reports:
-        strc_result.to_csv(os.path.join(output_dir,'fingerprint_result.csv'))
+    if _calc_all_:
+        strc_result = strc_result.rename({
+            'ecfp':'ECFP4', 'maccs':'MACCS', 'daylight':'Daylight', 'pubchem':'PubChem'},axis=1)
+    else:
+        strc_result = strc_result.rename({
+            'ecfp':'ECFP4'},axis=1)
+    strc_result.to_csv(os.path.join(output_dir,'fingerprint_result.csv'))
     
     # Call classification/ensemble models
     print('Under real/generated classification...')
     cls_dnn_model_f = os.path.join(PLF_DIR,'models/classification/cls_dnn.hdf5')
     cls_rf_model_f = os.path.join(PLF_DIR,'models/classification/cls_rf.pkl')
-    
+    cls_xgb_model_f = os.path.join(PLF_DIR,'models/classification/XGBoost.best_model.pkl')
+    cls_lr_model_f = os.path.join(PLF_DIR,'models/classification/LR.best_model.pkl')
+    if not os.path.isfile(cls_xgb_model_f):
+        os.system(f'gzip -dk {cls_xgb_model_f}')
     # Call classification models
-    dnn_cls_model = utils.load_dnn(model_f=cls_dnn_model_f)
-    rf_cls_model = utils.load_rf(model_f=cls_rf_model_f)
+    xgb_cls_model = utils.load_sklrn_m(model_f=cls_xgb_model_f)
+    if _calc_all_:
+        dnn_cls_model = utils.load_tf_m(model_f=cls_dnn_model_f)
+        rf_cls_model = utils.load_sklrn_m(model_f=cls_rf_model_f)
+        lr_cls_model = utils.load_sklrn_m(model_f=cls_lr_model_f)
 
     # Featurization
     feats = get_feats(smiles_input=smiles_list)
@@ -138,35 +153,52 @@ def predict(smiles_list:list,
     feats_null_dropped = feats_df.dropna()
     
     # Classification
-    dnn_cls_ps = _run_dnn_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=dnn_cls_model)
-    rf_cls_ps = _run_rf_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=rf_cls_model)
-    
-    cls_report_df = pd.DataFrame([dnn_cls_ps.reshape(-1,),rf_cls_ps.reshape(-1,)],
-                                 columns=feats_null_dropped.index,index=['DNN_cls_prob','RF_cls_prob']).T
+    xgb_cls_ps = _run_sklrn_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=xgb_cls_model)
+    if _calc_all_:
+        dnn_cls_ps = _run_tf_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=dnn_cls_model)
+        rf_cls_ps = _run_sklrn_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=rf_cls_model)
+        lr_cls_ps = _run_sklrn_cls(ecfp4_fing=np.array(feats_null_dropped.values),model=lr_cls_model)
+        
+        cls_report_df = pd.DataFrame(
+            [
+                dnn_cls_ps.reshape(-1,),
+                rf_cls_ps.reshape(-1,),
+                xgb_cls_ps.reshape(-1,),
+                lr_cls_ps.reshape(-1,)
+            ],
+            columns=feats_null_dropped.index,
+            index=['DNN_cls_prob','RF_cls_prob','XGBoost_cls_prob','LR_cls_prob']).T
+    else:
+        cls_report_df = pd.DataFrame(
+            [xgb_cls_ps.reshape(-1,)],
+            columns=feats_null_dropped.index,index=['XGBoost_cls_prob']).T
     cls_report_df = pd.DataFrame(cls_report_df,index=smiles_list)
     cls_report_df.index.name='Smiles'
-    if save_tmp_reports:
-        cls_report_df.to_csv(os.path.join(output_dir,'classficiation_probability.csv'))
+    cls_report_df.to_csv(os.path.join(output_dir,'classficiation_probability.csv'))
     
-    
-    ensb_input_df = pd.concat([strc_result,cls_report_df],axis=1)
-#     if save_tmp_reports:
-#         ensb_input_df.to_csv(os.path.join(output_dir,'_ensemble_input.tsv'),sep='\t')
+    ensb_input_df = pd.concat([mol_props_df,strc_result,cls_report_df],axis=1)
+    ensb_input_df.to_csv(os.path.join(output_dir,'_ensemble_input.tsv'),sep='\t')
     
     # Dropping null
+    ensemble_target_features = [
+        'ECFP4',
+#         'MACCS','Daylight','PubChem','DNN_cls_prob','RF_cls_prob',
+        'XGBoost_cls_prob',
+#         'LR_cls_prob',
+#         'SA',
+        'QED','MW',
+#         'LogP',
+    ]
     _ensb_input_refined = ensb_input_df.dropna()
-    if ensemble_with_RF:
-        _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob','RF_cls_prob']] # with RF_cls_prob
-    else:
-        _ensb_input_refined = _ensb_input_refined.loc[:,['ECFP4','MACCS','Daylight','PubChem','DNN_cls_prob']] # without RF_cls_prob
-        
+    _ensb_input_refined = _ensb_input_refined.loc[:,ensemble_target_features] # with RF_cls_prob
+    
     if not os.path.isfile(ensb_model_f):
         if os.path.isfile(ensb_model_f+'.gz'):
             os.system("gzip -dk %s"%ensb_model_f+'.gz')
         else:
             raise(IOError('Cannot find ensemble model'))
             
-    ensb_model = utils.load_rf(model_f=ensb_model_f)
+    ensb_model = utils.load_sklrn_m(model_f=ensb_model_f)
     ensb_ps = ensb_model.predict_proba(np.array(_ensb_input_refined))[:,1].squeeze()
     ensb_ps_df = pd.DataFrame([ensb_ps],columns=_ensb_input_refined.index,index=['AnoChem_Final_Score']).T
     ensb_ps_df.to_csv(os.path.join(output_dir,'anochem_score.csv'))
@@ -192,4 +224,3 @@ def _web_post_prediction_(smiles):
     
     return results
 
-    
