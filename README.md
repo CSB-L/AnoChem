@@ -7,9 +7,20 @@
 
 Clone the github repository of AnoChem.
 
-AnoChem is implemented with `conda` environment.
+AnoChem is implemented with `conda` environment. For creation of conda environment,
 
-`conda create -f environment.yml`
+`conda create -n ${ENV_N} python=3.7 -y`
+
+Activation of conda environment
+`conda activate ${ENV_N}`
+
+`bash install.sh` for primary installation of dependencies
+
+For manual installation, create conda environment with those packages:
+
+- `tensorflow=2.7.0` `rdkit=2022.9.3` `openbabel` `PyFingerprint`
+- `scipy` `scikit-learn` `pandas` `numpy`
+- `tqdm` `ipython` ``
 
 Some dependencies are required for for manual installation:
 
